@@ -1,2 +1,2 @@
-# Kovasic-Algorithm
-My personal project to perform Kovasic Algorithm.
+# Kovacic-Algorithm
+My personal project to perform Kovacic Algorithm.
