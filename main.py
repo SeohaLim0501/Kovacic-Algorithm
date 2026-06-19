@@ -16,8 +16,8 @@ def parse_args():
         "-t",
         "--timeout",
         type=float,
-        default=10,
-        help="integration timeout in seconds for case 1 and case 2 omega integration (default: 10)",
+        default=1,
+        help="integration timeout in seconds for case 1 and case 2 omega integration (default: 1)",
     )
     parser.add_argument(
         "-c",
@@ -30,8 +30,8 @@ def parse_args():
         "-t2",
         "--timer2",
         type=float,
-        default=10,
-        help="solve timeout in seconds for the case 3 omega equation (default: 10)",
+        default=1,
+        help="solve timeout in seconds for the case 3 omega equation (default: 1)",
     )
     return parser.parse_args()
 

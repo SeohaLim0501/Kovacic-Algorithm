@@ -214,7 +214,7 @@ Kovacic's case 1, step 3. Compute possible polynomial p of degree d. Returns dic
 - "z_evaluated": z_eval,
 - "coeff_solution": sol
 '''
-def case1_step3(r, x, candidates, integration_timeout_seconds=10):
+def case1_step3(r, x, candidates, integration_timeout_seconds=1):
     omega = simplify(candidates["omega"])
     r = exactify(r)
     r = cancel(r)
@@ -447,7 +447,7 @@ Kovasic's case 2, step 3. Computes possible polynomial p of degree d, expression
 "coeff_solution": sol,
 "candidate": candidates
 '''
-def case2_step3(r, x, candidates, integration_timeout_seconds=10):
+def case2_step3(r, x, candidates, integration_timeout_seconds=1):
     theta = simplify(candidates["theta"])
     r = exactify(r)
     r = cancel(r)
@@ -797,8 +797,8 @@ It inputs a rational function r and the variable x, and returns the solution if 
 def simpleKovacic(
     r,
     x,
-    integration_timeout_seconds=10,
-    solve_timeout_seconds=10,
+    integration_timeout_seconds=1,
+    solve_timeout_seconds=1,
 ):
     r = exactify(r)
 

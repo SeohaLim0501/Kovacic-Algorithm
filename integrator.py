@@ -11,7 +11,7 @@ def _integrate_worker(expr, x, queue):
         queue.put(("error", repr(exc)))
 
 
-def integrate_with_timeout(expr, x, timeout_seconds=10):
+def integrate_with_timeout(expr, x, timeout_seconds=1):
     context = get_context("spawn")
     queue = context.Queue()
     process = context.Process(target=_integrate_worker, args=(expr, x, queue))
@@ -41,7 +41,7 @@ def _solve_worker(equation, symbol, queue):
         queue.put(("error", repr(exc)))
 
 
-def solve_with_timeout(equation, symbol, timeout_seconds=10):
+def solve_with_timeout(equation, symbol, timeout_seconds=1):
     context = get_context("spawn")
     queue = context.Queue()
     process = context.Process(
