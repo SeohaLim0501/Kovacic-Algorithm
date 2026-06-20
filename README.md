@@ -109,6 +109,301 @@ Clear all contents of `input.txt`:
 Clear-Content input.txt
 ```
 
+## `kovacic.py`
+
+The `kovacic.py` module exposes `simpleKovacic`, which applies Kovacic's
+algorithm directly to an equation already written in reduced form:
+
+```text
+z'' = r(x)z
+```
+
+Import it with:
+
+```python
+from sympy import symbols
+from kovacic import simpleKovacic
+
+x = symbols("x")
+r = (x**2 + 1) / x**2
+result = simpleKovacic(r, x)
+```
+
+### `simpleKovacic` Input
+
+The function signature is:
+
+```python
+simpleKovacic(
+    r,
+    x,
+    integration_timeout_seconds=1,
+    solve_timeout_seconds=1,
+)
+```
+
+- `r` is the SymPy rational function on the right-hand side of
+  `z'' = r(x)z`.
+- `x` is the SymPy `Symbol` used as the independent variable.
+- `integration_timeout_seconds` limits the integration of `omega` in Cases 1
+  and 2. If integration times out, the solution remains in formal
+  `exp(Integral(...))` form.
+- `solve_timeout_seconds` limits solving the algebraic equation for `omega`
+  in Case 3.
+
+`simpleKovacic` expects an already reduced equation. To start with a general
+homogeneous second-order equation such as `y'' + a*y' + b*y = 0`, use
+`SecOrdSolver` from `SecOrdSolver.py`.
+
+### `simpleKovacic` Output
+
+The return value is a dictionary with three top-level keys:
+
+```python
+result = {
+    "solution": ...,  # solution expression, Case 3 data, or failure message
+    "status": ...,    # short description of the outcome
+    "debug": {...},   # pole analysis and case-specific intermediate data
+}
+```
+
+Not every key inside `debug` is always present. Case-specific data is added
+only when that case is valid and reached, and the function returns as soon as
+a case succeeds.
+
+#### `solution`
+
+For the trivial equation `z'' = 0`, `solution` is the general linear
+solution:
+
+```python
+C1*x + C2
+```
+
+For a successful Case 1 or Case 2, it is a SymPy expression representing one
+Liouvillian solution. When the final integration times out, the expression
+may contain an unevaluated `Integral`.
+
+For a successful Case 3, a closed-form root for `omega` may not be available,
+so `solution` has this structure:
+
+```python
+{
+    "form": "exp(Integral(omega, x))",
+    "omega_symbol": omega,
+    "omega_equation": Eq(..., 0),
+}
+```
+
+If Cases 1, 2, and 3 all fail, the value is:
+
+```python
+"No Liuvillian solution for this!"
+```
+
+#### `status`
+
+`status` is a human-readable summary. Current values include:
+
+```text
+Solved trivial equation z'' = 0
+Solved by Kovacic case 1
+Solved by Kovacic case 2
+Solved by Kovacic case 3 with n=4
+Solved by Kovacic case 3 with n=6
+Solved by Kovacic case 3 with n=12
+No Liuvillian solution found
+```
+
+#### `debug`
+
+For every nontrivial input, `debug` begins with a shared pole analysis:
+
+```python
+debug["pole_analysis"] = {
+    "num": ...,
+    "den": ...,
+    "deg_num": ...,
+    "deg_den": ...,
+    "finite_poles": {pole: order, ...},
+    "num_finite_poles": ...,
+    "pole_at_infinity": ...,
+    "case_analysis": {
+        "case1_valid": True_or_False,
+        "case2_valid": True_or_False,
+        "case3_valid": True_or_False,
+    },
+}
+```
+
+The remaining keys depend on the Kovacic case.
+
+##### Case 1 debug data
+
+When Case 1 is valid, the finite-pole and infinity data are stored as:
+
+```python
+debug["case1_finite_data"] = {
+    "sqrtR": {pole: value, ...},
+    "alphaPlus": {pole: value, ...},
+    "alphaMinus": {pole: value, ...},
+}
+
+debug["case1_infinity_data"] = {
+    "sqrtR_inf": ...,
+    "alphaPlus_inf": ...,
+    "alphaMinus_inf": ...,
+}
+```
+
+`debug["case1_candidates"]` is a list of candidate dictionaries:
+
+```python
+{
+    "d": ...,
+    "d_expr": ...,
+    "omega": ...,
+    "finite_signs": {pole: 1_or_minus_1, ...},
+    "inf_sign": 1_or_minus_1,
+    "finite_alpha": {pole: value, ...},
+    "infinite_alpha": ...,
+}
+```
+
+On success, the following keys are also present:
+
+```python
+debug["successful_case"] = 1
+debug["successful_candidate"] = {...}
+debug["case1_step3"] = {
+    "p": ...,
+    "omega": ...,
+    "z": ...,
+    "z_evaluated": ...,
+    "integration_timed_out": True_or_False,
+    "coeff_solution": {...},
+}
+```
+
+If the case does not produce a candidate, `debug["case1_status"]` explains
+why. In the current implementation, the `d == 0` success path contains the
+misspelled key `coeff_soution` instead of `coeff_solution`.
+
+##### Case 2 debug data
+
+When Case 2 is valid, its pole data is stored as:
+
+```python
+debug["case2_finite_data"] = {
+    "E": {pole: [values], ...},
+    "bval": {pole: value, ...},
+}
+
+debug["case2_infinity_data"] = {
+    "E_inf": [values],
+    "b_inf": ...,
+}
+```
+
+`debug["case2_candidates"]` contains dictionaries of the form:
+
+```python
+{
+    "d": ...,
+    "d_expr": ...,
+    "theta": ...,
+    "e_finite": {pole: value, ...},
+    "e_inf": ...,
+}
+```
+
+On success, the additional data is:
+
+```python
+debug["successful_case"] = 2
+debug["successful_candidate"] = {...}
+debug["case2_step3"] = {
+    "p": ...,
+    "theta": ...,
+    "phi": ...,
+    "omega": ...,
+    "z": ...,
+    "z_evaluated": ...,
+    "integration_timed_out": True_or_False,
+    "coeff_solution": {...},
+    "candidate": {...},
+}
+```
+
+If Case 2 is invalid or produces no candidate, `debug["case2_status"]`
+contains the reason.
+
+##### Case 3 debug data
+
+Case 3 tests `n = 4`, `6`, and `12`. Its finite-pole and infinity data are
+therefore dictionaries keyed by `n`:
+
+```python
+debug["case3_finite_data"] = {
+    n: {
+        "E": {pole: [values], ...},
+        "bval": {pole: value, ...},
+    },
+    ...,
+}
+
+debug["case3_infinity_data"] = {
+    n: {
+        "E_inf": [values],
+        "b_inf": ...,
+    },
+    ...,
+}
+```
+
+`debug["case3_candidates"]` contains dictionaries of the form:
+
+```python
+{
+    "n": 4_or_6_or_12,
+    "d": ...,
+    "d_expr": ...,
+    "theta": ...,
+    "S": ...,
+    "e_finite": {pole: value, ...},
+    "e_inf": ...,
+}
+```
+
+When a recurrence polynomial is found, Case 3 adds:
+
+```python
+debug["case3_N"] = ...
+debug["case3_Efinite"] = {...}
+debug["case3_Einfinite"] = ...
+debug["case3_P0"] = ...
+debug["case3_omega_equation"] = ...
+debug["case3_solve_timed_out"] = True_or_False
+debug["case3_omega_solutions"] = [...]  # present when solving succeeds
+
+debug["successful_case"] = 3
+debug["successful_candidate"] = {...}
+debug["case3_step3"] = {
+    "P": ...,
+    "theta": ...,
+    "S": ...,
+    "n": ...,
+    "d": ...,
+    "P_sequence": {degree: expression, ...},
+    "coeff_solution": {...},
+    "candidate": {...},
+}
+```
+
+`debug["case3_status"]` reports whether the case was invalid, had no
+nonnegative integer `d`, failed to find a recurrence polynomial, timed out
+while solving for `omega`, or solved the `omega` equation.
+
 ## Output Format
 
 The program first prints the selected input file and timeout settings:
