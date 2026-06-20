@@ -941,8 +941,12 @@ def simpleKovacic(
             result["debug"]["case3_status"] = "Case 3 valid, but no nonnegative integer d found"
 
     else:
-        result["solution"] = "No Liuvillian solution for this!"
+        result["debug"]["case3_status"] = "Case 3 conditions not satisfied"
 
+    # Every successful Kovacic case returns above. Reaching this point means
+    # that cases 1, 2, and 3 have all failed to produce a solution.
+    result["solution"] = "No Liuvillian solution for this!"
+    result["status"] = "No Liuvillian solution found"
 
     return result
 
