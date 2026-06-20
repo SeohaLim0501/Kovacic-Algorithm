@@ -75,6 +75,16 @@ x + 77/(16*x**2)
 My test | (4*x**2 + 8*x + 6)/(2*x + 1)**2
 ```
 
+Second-order ODE input is also accepted. Use SymPy derivative syntax with
+`y(x)` or `z(x)`; both `Eq` and left-hand-side-only forms are supported:
+
+```txt
+ODE with Eq | Eq(diff(y(x), x, 2) + 2*x*diff(y(x), x) + y(x), 0)
+ODE lhs only | diff(y(x), x, 2) - y(x)
+```
+
+ODE input is regularized automatically and solved through `SecOrdSolver`.
+
 In PowerShell, overwrite `input.txt` with one test case:
 
 ```powershell

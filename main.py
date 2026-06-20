@@ -2,9 +2,10 @@ from argparse import ArgumentParser
 from pathlib import Path
 from time import perf_counter
 
-from sympy import S, sstr, symbols, sympify
+from sympy import Derivative, Eq, Function, S, diff, sstr, symbols, sympify
 
 from kovacic import simpleKovacic
+from SecOrdSolver import SecOrdSolver, regularize
 
 
 EXAMPLES_PATH = Path(__file__).with_name("examples.txt")
@@ -38,7 +39,17 @@ def parse_args():
 
 def load_test_cases(path, x):
     test_cases = []
-    locals_map = {"x": x, "S": S}
+    y = Function("y")
+    z = Function("z")
+    locals_map = {
+        "x": x,
+        "y": y,
+        "z": z,
+        "S": S,
+        "Eq": Eq,
+        "Derivative": Derivative,
+        "diff": diff,
+    }
 
     for line_number, raw_line in enumerate(path.read_text().splitlines(), start=1):
         line = raw_line.strip()
@@ -185,14 +196,23 @@ def main():
     print(f"Equation Solve timeout: {args.timer2:g} seconds")
     print("=" * 72)
 
-    for index, (title, r) in enumerate(test_cases, start=1):
+    for index, (title, expr) in enumerate(test_cases, start=1):
         start = perf_counter()
-        result = simpleKovacic(
-            r,
-            x,
-            integration_timeout_seconds=args.timeout,
-            solve_timeout_seconds=args.timer2,
-        )
+        if expr.has(Derivative):
+            r = regularize(expr)
+            result = SecOrdSolver(
+                expr,
+                integration_timeout_seconds=args.timeout,
+                solve_timeout_seconds=args.timer2,
+            )
+        else:
+            r = expr
+            result = simpleKovacic(
+                r,
+                x,
+                integration_timeout_seconds=args.timeout,
+                solve_timeout_seconds=args.timer2,
+            )
         elapsed_seconds = perf_counter() - start
         print_test_result(index, title, r, result, elapsed_seconds)
 

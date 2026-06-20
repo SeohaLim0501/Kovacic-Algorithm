@@ -1,3 +1,9 @@
-[case 1] z'' = (x**2 - 2*x + 3 + 1/x + 7/(4*x**2) - 5/x**3 + 1/x**4) * z | x**2 - 2*x + 3 + 1/x + 7/(4*x**2) - 5/x**3 + 1/x**4
-[case 2] z'' = (-8*x - 3)/(16*x**2) * z | (-8*x - 3)/(16*x**2)
-[case 3] z'' = (-3/(16*x**2) - 2/(9*(x - 1)**2) + 3/(16*x*(x - 1))) * z | -3/(16*x**2) - 2/(9*(x - 1)**2) + 3/(16*x*(x - 1))
+# Second-order ODE examples
+[ODE Eq] y'' - y = 0 | Eq(diff(y(x), x, 2) - y(x), 0)
+[ODE lhs] y'' + 2*y' = 0 | diff(y(x), x, 2) + 2*diff(y(x), x)
+
+# ODE with variable polynomial coefficients; regularizes to z'' = z
+[ODE polynomial] y'' + x*y' + (x**2/4 - 1/2)*y = 0 | Eq(diff(y(x), x, 2) + x*diff(y(x), x) + (x**2/4 - S(1)/2)*y(x), 0)
+
+# ODE with rational coefficients; regularizes to a Kovacic case 2 equation
+[ODE rational case 2] y'' + (2*x + 2/x)*y' + (x**2 - x + 3 - 77/(16*x**2))*y = 0 | Eq(diff(y(x), x, 2) + (2*x + 2/x)*diff(y(x), x) + (x**2 - x + 3 - 77/(16*x**2))*y(x), 0)
