@@ -109,6 +109,76 @@ Clear all contents of `input.txt`:
 Clear-Content input.txt
 ```
 
+## Testing with `test.py`
+
+`test.py` runs the equations in `kovacic_test.txt` and checks whether the
+detected Kovacic case matches the expected case stored on each line. It also:
+
+- compiles the project modules before running the tests;
+- continues to the next test when one test raises an exception;
+- prints green `Correct!` or red `Incorrect!` for each result;
+- reports the score and the numbers of all incorrect tests;
+- reports the average elapsed time for each expected case;
+- writes the complete output automatically to `result.txt` without ANSI
+  color codes.
+
+Run the default test suite with:
+
+```bash
+python test.py
+```
+
+The integration and Case 3 equation-solve timeouts use the same options as
+`main.py`:
+
+```bash
+python test.py -t 5 -t2 20
+```
+
+Use another test file or output file with `-c` and `-o`:
+
+```bash
+python test.py -c my_tests.txt -o my_results.txt
+```
+
+`result.txt` is overwritten on each default run.
+
+### Editing `kovacic_test.txt`
+
+Each non-comment line must contain exactly three fields separated by `|`:
+
+```text
+title | r(x) | expected_case
+```
+
+For example:
+
+```text
+Constant Case 1 | 1 | 1
+Airy-like Case 4 | -x**3 + 3*x - 1 | 4
+Trivial equation | 0 | 0
+```
+
+The expected case must be an integer from `0` to `4`:
+
+- `0`: the trivial equation `z'' = 0`;
+- `1`: Kovacic Case 1;
+- `2`: Kovacic Case 2;
+- `3`: Kovacic Case 3;
+- `4`: Cases 1, 2, and 3 all fail, so no Liouvillian solution is found.
+
+Blank lines and lines beginning with `#` are ignored:
+
+```text
+# title | r(x) | expected_case
+[case 2] example | x + 77/(16*x**2) | 2
+```
+
+The expression field is parsed as a SymPy expression. Use `I` for the
+imaginary unit, `S(1)/2` for an explicit SymPy rational when needed, and `x`
+as the independent variable. General second-order ODE expressions may also
+use `Eq`, `diff`, `Derivative`, `y(x)`, and `z(x)`.
+
 ## `kovacic.py`
 
 The `kovacic.py` module exposes `simpleKovacic`, which applies Kovacic's
@@ -360,6 +430,10 @@ debug["case3_infinity_data"] = {
     ...,
 }
 ```
+
+The values of `n` are evaluated lazily. If Case 3 succeeds for `n = 4`, the
+dictionaries contain only the key `4`; keys `6` and `12` are added only when
+those values are actually reached.
 
 `debug["case3_candidates"]` contains dictionaries of the form:
 

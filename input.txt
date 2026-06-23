@@ -1,9 +1,1 @@
-# Second-order ODE examples
-[ODE Eq] y'' - y = 0 | Eq(diff(y(x), x, 2) - y(x), 0)
-[ODE lhs] y'' + 2*y' = 0 | diff(y(x), x, 2) + 2*diff(y(x), x)
-
-# ODE with variable polynomial coefficients; regularizes to z'' = z
-[ODE polynomial] y'' + x*y' + (x**2/4 - 1/2)*y = 0 | Eq(diff(y(x), x, 2) + x*diff(y(x), x) + (x**2/4 - S(1)/2)*y(x), 0)
-
-# ODE with rational coefficients; regularizes to a Kovacic case 2 equation
-[ODE rational case 2] y'' + (2*x + 2/x)*y' + (x**2 - x + 3 - 77/(16*x**2))*y = 0 | Eq(diff(y(x), x, 2) + (2*x + 2/x)*diff(y(x), x) + (x**2 - x + 3 - 77/(16*x**2))*y(x), 0)
+[case 1] z'' = (0) * z | 0

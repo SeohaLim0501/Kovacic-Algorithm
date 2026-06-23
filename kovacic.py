@@ -11,6 +11,7 @@ from utils import (
     givePoleAnalysis,
     is_nonnegative_integer,
     laurent_coeff,
+    normalize_complex_constant,
     pole_coeff,
     case3_E_order2_fromb,
 )
@@ -103,8 +104,8 @@ def case1_infinity_pole_data(r, x, O_inf):
         
         return {
             "sqrtR_inf": S.Zero,
-            "alphaPlus_inf": simplify((S.One + root) / S(2)),
-            "alphaMinus_inf": simplify((S.One - root) / S(2))
+            "alphaPlus_inf": normalize_complex_constant((S.One + root) / S(2)),
+            "alphaMinus_inf": normalize_complex_constant((S.One - root) / S(2))
         }
     
     if O_inf <= 0:
@@ -135,8 +136,8 @@ def case1_infinity_pole_data(r, x, O_inf):
 
         return {
             "sqrtR_inf": sqrtR_inf,
-            "alphaPlus_inf": simplify((-S(v) + b / av) / S(2)),
-            "alphaMinus_inf": simplify((-S(v) - b / av) / S(2))
+            "alphaPlus_inf": normalize_complex_constant((-S(v) + b / av) / S(2)),
+            "alphaMinus_inf": normalize_complex_constant((-S(v) - b / av) / S(2))
         }
     
     raise ValueError("Unhandled case for infinity pole for case 1")
@@ -235,7 +236,7 @@ def case1_step3(r, x, candidates, integration_timeout_seconds=1):
     num, den = fraction(expr)
     num = expand(num)
     
-    if simplify(num) == 0:
+    if num == 0:
         z = p * exp(Integral(omega, x))
         Iomega = integrate_with_timeout(omega, x, integration_timeout_seconds)
         integration_timed_out = Iomega is None
@@ -263,12 +264,12 @@ def case1_step3(r, x, candidates, integration_timeout_seconds=1):
         return None
     
     for sol in sol_list:
-        p_sol = simplify(p.subs(sol))
+        p_sol = expand(p.subs(sol))
         check = diff(p_sol, x, 2) + 2*omega*diff(p_sol, x) + (
             diff(omega, x) + omega**2 - r
         ) * p_sol
-        check = simplify(cancel(together(check)))
-        if check == 0:
+        check_num = expand(cancel(together(check)).as_numer_denom()[0])
+        if check_num == 0:
             z = p_sol * exp(Integral(omega, x))
             Iomega = integrate_with_timeout(omega, x, integration_timeout_seconds)
             integration_timed_out = Iomega is None
@@ -316,7 +317,7 @@ def case2_finite_pole_data(r, x, finite_poles):
 
             Ec = []
             for e in raw_E:
-                e = simplify(radsimp(e))
+                e = normalize_complex_constant(e)
                 if e.is_integer is True:
                     Ec.append(e)
 
@@ -367,7 +368,7 @@ def case2_infinite_pole_data(r, x, infinite_poles):
 
         E_inf = []
         for e in raw_E:
-            e = simplify(radsimp(e))
+            e = normalize_complex_constant(e)
             if e.is_integer is True:
                 E_inf.append(e)
 
@@ -467,7 +468,7 @@ def case2_step3(r, x, candidates, integration_timeout_seconds=1):
     num, den = expr.as_numer_denom()
     num = expand(num)
     
-    if simplify(num) == 0:
+    if num == 0:
         sol_list = [{}]
 
     else:
@@ -481,12 +482,11 @@ def case2_step3(r, x, candidates, integration_timeout_seconds=1):
             return None
     
     for sol in sol_list:
-        p_sol = simplify(p.subs(sol))
+        p_sol = expand(p.subs(sol))
         check = (diff(p_sol, x, 3) + 3*theta*diff(p_sol, x, 2) + (3*theta**2 + 3*diff(theta, x, 1) - 4*r) * diff(p_sol, x, 1)
         + (diff(theta, x, 2) + 3*theta*diff(theta, x, 1) + theta**3 - 4*r*theta - 2*diff(r, x, 1)) * p_sol)
-        check = simplify(cancel(together(check)))
-        check_num, check_den = check.as_numer_denom()
-        if simplify(expand(check_num)) != 0:
+        check_num = expand(cancel(together(check)).as_numer_denom()[0])
+        if check_num != 0:
             continue
         
         phi = simplify(theta + diff(p_sol, x) / p_sol)
@@ -522,43 +522,41 @@ def case2_step3(r, x, candidates, integration_timeout_seconds=1):
     return None
 
 
-'''
-Kovacic's case 3, step 1 for finite, infinite poles. Returns dictionary of:
-- 4: {"E"/"E_inf":
-      "bval"/"b_inf":}
-- 6:
-- 12:
-'''
-def case3_finite_pole_data(r, x, finite_poles):
+'''Compute the Case 3 b value once for each finite pole of order 2.'''
+def case3_finite_pole_bvals(r, x, finite_poles):
     r = exactify(r)
     r = cancel(r)
-    data = {}
+    bval = {}
 
-    for n in [4, 6,12]:
-        E = {}
-        bval = {}
+    for c, order in finite_poles.items():
+        if order == 2:
+            bval[c] = pole_coeff(r, x, c, 2)
+        elif order != 1:
+            raise ValueError("This cannot happen in case 3")
 
-        for c, order in finite_poles.items():
-            if order == 1:
-                E[c] = [S(12)]
-            
-            elif order == 2:
-                b = pole_coeff(r, x, c, 2)
-                bval[c] = b
-                E[c] = case3_E_order2_fromb(b, n)
-            
-            else:
-                raise ValueError("This cannot happen in case 3")
-
-        data[n] = {
-            "E": E,
-            "bval": bval
-        }
-
-    return data
+    return bval
 
 
-def case3_infinite_pole_data(r, x, O_inf):
+'''Compute finite-pole Case 3 E data for one value of n.'''
+def case3_finite_pole_data(finite_poles, bval, n):
+    E = {}
+
+    for c, order in finite_poles.items():
+        if order == 1:
+            E[c] = [S(12)]
+        elif order == 2:
+            E[c] = case3_E_order2_fromb(bval[c], n)
+        else:
+            raise ValueError("This cannot happen in case 3")
+
+    return {
+        "E": E,
+        "bval": bval,
+    }
+
+
+'''Compute the Case 3 b value at infinity once.'''
+def case3_infinity_b(r, x, O_inf):
     r = exactify(r)
     r = cancel(r)
     if O_inf < 2:
@@ -573,21 +571,20 @@ def case3_infinite_pole_data(r, x, O_inf):
     else:
         b = S.Zero
     
-    data = {}
+    return b
 
-    for n in [4, 6, 12]:
-        E_inf = case3_E_order2_fromb(b, n)
-        data[n] = {
-            "E_inf": E_inf,
-            "b_inf": b
-        }
 
-    return data
+'''Compute infinity Case 3 E data for one value of n.'''
+def case3_infinite_pole_data(b, n):
+    return {
+        "E_inf": case3_E_order2_fromb(b, n),
+        "b_inf": b,
+    }
 
 
 '''
 Kovacic's case 3, step 2.
-Returns a list of dictionaries:
+Yields candidate dictionaries one at a time:
 - "n"
 - "d"
 - "d_expr"
@@ -596,8 +593,7 @@ Returns a list of dictionaries:
 - "e_finite"
 - "e_inf"
 '''
-def case3_step2(r, x, finite_poles, finite_data, inf_data):
-    candidates = []
+def case3_step2(x, finite_poles, finite_data, inf_data, case_n):
     poles_list = list(finite_poles.keys())
 
     S_poly = S.One
@@ -605,9 +601,9 @@ def case3_step2(r, x, finite_poles, finite_data, inf_data):
         S_poly *= (x - c)
     S_poly = expand(S_poly)
 
-    for n in [4, 6, 12]:
-        E = finite_data[n]["E"]
-        E_inf = inf_data[n]["E_inf"]
+    for n in (case_n,):
+        E = finite_data["E"]
+        E_inf = inf_data["E_inf"]
 
         bad_n = False
         for c in poles_list:
@@ -640,7 +636,7 @@ def case3_step2(r, x, finite_poles, finite_data, inf_data):
 
                 theta = simplify(S(n) * theta / S(12))
 
-                candidates.append({
+                yield {
                     "n": n,
                     "d": d,
                     "d_expr": d_expr,
@@ -648,9 +644,7 @@ def case3_step2(r, x, finite_poles, finite_data, inf_data):
                     "S": S_poly,
                     "e_finite": dict(zip(poles_list, e_tuple)),
                     "e_inf": e_inf,
-                })
-
-    return candidates
+                }
 
 
 '''
@@ -694,7 +688,7 @@ def case3_step3_find_P(r, x, candidate):
     target_num, target_den = target.as_numer_denom()
     target_num = expand(target_num)
 
-    if simplify(target_num) == 0:
+    if target_num == 0:
         P_sol = simplify(P)
         P_seq_sol = {
             k: simplify(v)
@@ -736,7 +730,7 @@ def case3_step3_find_P(r, x, candidate):
         target_check = cancel(together(target_check))
         check_num, check_den = target_check.as_numer_denom()
 
-        if simplify(expand(check_num)) != 0:
+        if expand(check_num) != 0:
             continue
 
         P_seq_sol = {
@@ -757,6 +751,36 @@ def case3_step3_find_P(r, x, candidate):
         }
     
     return None
+
+
+def case3_step2_find_P(r, x, finite_poles, O_inf):
+    """Generate Case 3 E data and candidates lazily, then find P."""
+    attempted_candidates = []
+    finite_data = {}
+    inf_data = {}
+    bval = case3_finite_pole_bvals(r, x, finite_poles)
+    b_inf = case3_infinity_b(r, x, O_inf)
+
+    for n in (4, 6, 12):
+        finite_data[n] = case3_finite_pole_data(
+            finite_poles, bval, n
+        )
+        inf_data[n] = case3_infinite_pole_data(b_inf, n)
+
+        for candidate in case3_step2(
+            x, finite_poles, finite_data[n], inf_data[n], n
+        ):
+            attempted_candidates.append(candidate)
+            Presult = case3_step3_find_P(r, x, candidate)
+            if Presult is not None:
+                return (
+                    attempted_candidates,
+                    (candidate, Presult),
+                    finite_data,
+                    inf_data,
+                )
+
+    return attempted_candidates, None, finite_data, inf_data
 
 
 '''
@@ -800,7 +824,7 @@ def simpleKovacic(
     integration_timeout_seconds=1,
     solve_timeout_seconds=1,
 ):
-    r = exactify(r)
+    r = cancel(exactify(r))
 
     result = {
         'solution' : None,
@@ -808,7 +832,7 @@ def simpleKovacic(
         'debug' : {}
     }
 
-    if simplify(r) == 0:
+    if r == 0:
         C1, C2 = symbols("C1 C2")
         result["solution"] = C1*x + C2
         result["status"] = "Solved trivial equation z'' = 0"
@@ -873,20 +897,17 @@ def simpleKovacic(
         result["debug"]["case2_status"] = "Case 2 conditions not satisfied"
 
     if pole_analysis["case_analysis"]["case3_valid"]:
-        finite_data = case3_finite_pole_data(r, x, finite_poles)
-        inf_data = case3_infinite_pole_data(r, x, O_inf)
-        candidates = case3_step2(r, x, finite_poles, finite_data, inf_data)
+        candidates, successful_case3, finite_data, inf_data = (
+            case3_step2_find_P(r, x, finite_poles, O_inf)
+        )
         
         result["debug"]["case3_finite_data"] = finite_data
         result["debug"]["case3_infinity_data"] = inf_data
         result["debug"]["case3_candidates"] = candidates
 
-        if candidates:
-            found_case3_P = False
-            for cand in candidates:
-                Presult = case3_step3_find_P(r, x, cand)
+        if successful_case3 is not None:
+            for cand, Presult in [successful_case3]:
                 if Presult is not None:
-                    found_case3_P = True
                     result["debug"]["case3_N"] = cand["n"]
                     result["debug"]["case3_Efinite"] = cand["e_finite"]
                     result["debug"]["case3_Einfinite"] = cand["e_inf"]
@@ -932,10 +953,10 @@ def simpleKovacic(
 
                     return result
 
-            if not found_case3_P:
-                result["debug"]["case3_status"] = (
-                    "Case 3 valid, but no polynomial P found"
-                )
+        elif candidates:
+            result["debug"]["case3_status"] = (
+                "Case 3 valid, but no polynomial P found"
+            )
 
         else:
             result["debug"]["case3_status"] = "Case 3 valid, but no nonnegative integer d found"

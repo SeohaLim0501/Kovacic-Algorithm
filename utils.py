@@ -8,7 +8,10 @@ For example, it turns decimal numbers into rationals.
 For obvious numbers like 3.141592653589793, it will convert to pi.
 '''
 def exactify(expr):
-    return nsimplify(sympify(expr))
+    expr = sympify(expr)
+    if not expr.has(Float):
+        return expr
+    return nsimplify(expr)
 
 
 '''
@@ -19,9 +22,62 @@ def laurent_coeff(expr, x, c, k):
     y = Dummy("y")
     shifted = expr.subs(x, c + y)
     order = max(1, abs(k) + 3)
-    ser = series(shifted, y, 0, order).removeO()
 
-    return simplify(expand(ser).coeff(y, k))
+    try:
+        ser = series(shifted, y, 0, order).removeO()
+    except NotImplementedError:
+        if not expr.is_rational_function(x):
+            raise
+        return _rational_laurent_coeff(expr, x, c, k)
+
+    return normalize_complex_constant(expand(ser).coeff(y, k))
+
+
+def _rational_laurent_coeff(expr, x, c, k):
+    """Compute a rational Laurent coefficient using exact derivatives."""
+    num, den = fraction(cancel(expr))
+    pole_order = roots(Poly(den, x).as_expr(), x).get(c)
+
+    if pole_order is None:
+        if k < 0:
+            return S.Zero
+        return normalize_complex_constant(
+            diff(expr, x, k).subs(x, c) / factorial(k)
+        )
+
+    coefficient_index = k + pole_order
+    if coefficient_index < 0:
+        return S.Zero
+
+    q_leading = normalize_complex_constant(
+        diff(den, x, pole_order).subs(x, c) / factorial(pole_order)
+    )
+    if q_leading == 0:
+        raise ValueError(
+            f"Could not determine the leading denominator coefficient at {c}."
+        )
+
+    coefficients = []
+    for n in range(coefficient_index + 1):
+        p_n = normalize_complex_constant(
+            diff(num, x, n).subs(x, c) / factorial(n)
+        )
+        previous_terms = S.Zero
+
+        for s in range(1, n + 1):
+            q_term = normalize_complex_constant(
+                diff(den, x, pole_order + s).subs(x, c)
+                / factorial(pole_order + s)
+            )
+            previous_terms += q_term * coefficients[n - s]
+
+        coefficients.append(
+            normalize_complex_constant(
+                (p_n - previous_terms) / q_leading
+            )
+        )
+
+    return coefficients[coefficient_index]
 
 
 '''
@@ -37,7 +93,7 @@ order_at_infinity(expr, x) computes the order of the pole at infinity.
 def order_at_infinity(expr, x):
     expr = cancel(expr)
     num, den = fraction(expr)
-    if simplify(num) == 0:
+    if num == 0:
         return oo
     
     num_poly = Poly(num, x)
@@ -53,7 +109,7 @@ This uses roots(den, x).
 def get_poles_with_orders(r, x):
     r = cancel(r)
     num, den = fraction(r)
-    if simplify(num) == 0:
+    if num == 0:
         return {}
     
     den_poly = Poly(den, x)
@@ -85,7 +141,7 @@ def givePoleAnalysis(r, x):
         num, den = fraction(r_cancelled)
 
         # Special case: r = 0
-        if simplify(num) == 0:
+        if num == 0:
             return {
                 "num": S.Zero,
                 "den": S.One,
@@ -181,7 +237,7 @@ def coeff_at_infinity(expr, x, k):
 
     ser = series(expr_y, y, 0, order).removeO()
     
-    return simplify(expand(ser).coeff(y, -k))
+    return normalize_complex_constant(expand(ser).coeff(y, -k))
 
 
 '''
@@ -190,11 +246,30 @@ Returns int(expr) if expr is a nonnegative integer.
 Otherwise return None. 
 '''
 def is_nonnegative_integer(expr):
-    expr = simplify(radsimp(expr))
+    expr = normalize_complex_constant(expr)
     if expr.is_integer is True and expr.is_nonnegative is True:
         return int(expr)
 
     return None
+
+
+def normalize_complex_constant(expr):
+    """Normalize an exact complex constant without touching symbolic expressions."""
+    expr = cancel(sympify(expr))
+
+    has_noninteger_power = any(
+        power.exp.is_integer is not True
+        for power in expr.atoms(Pow)
+    )
+    if not has_noninteger_power:
+        return expr
+
+    expr = radsimp(expr)
+
+    if not expr.free_symbols:
+        return simplify(expand_complex(expr))
+
+    return expr
 
 
 '''
@@ -206,7 +281,7 @@ def case3_E_order2_fromb(b, n):
 
     for k in range(-n//2, n//2 + 1):
         e = S(6) + S(12)*S(k)*root/S(n)
-        e = simplify(radsimp(e))
+        e = normalize_complex_constant(e)
 
         if e.is_integer is True:
             E.append(e)
